@@ -1,7 +1,4 @@
-
-
 # BA-LoRA: Bias-Alleviating Low-Rank Adaptation for Mitigating Catastrophic Inheritance in Large Language Models
-
 
 -----
 
@@ -12,8 +9,9 @@
 conda create -n ba-lora python=3.10 -y
 conda activate ba-lora
 
-# Install core dependencies
-conda install pytorch==2.4.0 torchvision==0.19.0 pytorch-cuda=12.4 -c pytorch -c nvidia
+# Install CUDA Toolkit, PyTorch and other dependencies
+conda install nvidia/label/cuda-12.1.0::cuda-toolkit
+conda install pytorch==2.4.0 torchvision==0.19.0 pytorch-cuda=12.1 -c pytorch -c nvidia
 pip install -r requirements.txt
 
 # Optional: Install Flash Attention for acceleration
