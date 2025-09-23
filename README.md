@@ -22,19 +22,12 @@ pip install flash-attn --no-build-isolation
 
 ## Quick Start
 
-### For Natural Language Generation (NLG) Tasks:
 
 ```bash
 # Start training with default parameters
 sh scripts/ba-lora.sh
 ```
 
-### For Natural Language Understanding (NLU) Tasks:
-
-```bash
-# Fine-tuning bert-l on SST-2 dataset
-python finetune_bert_l_sst2.py
-```
 
 ### Visualizing Last Hidden Layer Features with t-SNE
 
