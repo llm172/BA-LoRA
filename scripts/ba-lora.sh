@@ -49,7 +49,7 @@ for i in "${!SEEDS[@]}"; do
     echo "  - Output Path: ${OUTPUT_PATH}"
     echo "===================================================================="
 
-    deepspeed --master_port=${MASTER_PORT} --include=localhost:0,1 train_ba_lora.py \
+    deepspeed --master_port=${MASTER_PORT} --include=localhost:0,1 train.py \
         --deepspeed configs/ds_config_zero2_no_offload.json \
         --model_name_or_path $RES_MODEL \
         --adapter_name_or_path "pissa_init" \
