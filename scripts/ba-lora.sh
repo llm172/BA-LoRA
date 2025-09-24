@@ -40,7 +40,7 @@ echo "--------------------------------------------------------------------"
 for i in "${!SEEDS[@]}"; do
     SEED_TO_SUMMON=${SEEDS[$i]}
     MASTER_PORT=$((MASTER_PORT_START + i))
-    OUTPUT_PATH="output/universality_study/1ba-lora_v5_r${TARGET_RANK}_seed${SEED_TO_SUMMON}"
+    OUTPUT_PATH="output/metamath-BA-LoRA-Llama-2-7b-r128${TARGET_RANK}_seed${SEED_TO_SUMMON}"
 
     echo "===================================================================="
     echo "Launching Training Run #${i+1}"
