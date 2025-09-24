@@ -14,7 +14,7 @@ conda install nvidia/label/cuda-12.1.0::cuda-toolkit
 conda install pytorch==2.4.0 torchvision==0.19.0 pytorch-cuda=12.1 -c pytorch -c nvidia
 pip install -r requirements.txt
 
-# Optional: Install Flash Attention for acceleration
+# Optional: Install Flash Attention for acceleration. If it fails, try: pip install flash-attn==2.5.8
 pip install flash-attn --no-build-isolation
 ```
 
