@@ -46,7 +46,7 @@ bash scripts/ba-lora.sh
 
 ### Visualizing Last Hidden Layer Features with t-SNE
 
-After fine-tuning the model for NLU tasks, you can visualize the last hidden layer features using t-SNE to analyze class separability in the feature space.
+After fine-tuning the model, you can visualize the last hidden layer features using t-SNE to analyze class separability in the feature space.
 
 1.  **Prepare Data**:
 
