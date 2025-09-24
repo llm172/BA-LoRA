@@ -23,7 +23,7 @@ pip install flash-attn --no-build-isolation
 ## Data Preparation
 
 ```bash
-# Set up Hugging Face endpoint if needed (e.g., for users in mainland China)
+# Set up Hugging Face endpoint if needed 
 # export HF_ENDPOINT=[https://hf-mirror.com](https://hf-mirror.com)
 
 # Install Hugging Face Hub library to download datasets
