@@ -6,7 +6,7 @@
 
 ```bash
 # Create a conda environment
-conda create -n ba-lora python=3.10 -y
+conda create -n ba-lora python=3.10 
 conda activate ba-lora
 
 # Install CUDA Toolkit, PyTorch and other dependencies
