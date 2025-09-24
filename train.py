@@ -176,7 +176,8 @@ class BALoRATrainer(Trainer):
                         loss_logs["svd_reg_loss"] = svd_regularizer.item()
                 except torch.linalg.LinAlgError as e:
                     logger.warning(f"SVD computation failed with LinAlgError. Skipping. Error: {e}")
-
+                    
+        self.log(loss_logs)
         return (total_loss, outputs) if return_outputs else total_loss
 
 class SavePeftModelCallback(transformers.TrainerCallback):
