@@ -40,7 +40,7 @@ huggingface-cli download --repo-type dataset --resume-download fxmeng/pissa-data
 
 ```bash
 # Start training with default parameters
-sh scripts/ba-lora.sh
+bash scripts/ba-lora.sh
 ```
 
 
