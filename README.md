@@ -1,4 +1,6 @@
-# BA-LoRA: Bias-Alleviating Low-Rank Adaptation for Mitigating Catastrophic Inheritance in Large Language Models
+# Official Implementation for Our Paper
+
+This repository contains the official implementation for our paper submitted for review.
 
 -----
 
@@ -6,15 +8,15 @@
 
 ```bash
 # Create a conda environment
-conda create -n ba-lora python=3.10 
-conda activate ba-lora
+conda create -n project-env python=3.10
+conda activate project-env
 
 # Install CUDA Toolkit, PyTorch and other dependencies
 conda install nvidia/label/cuda-12.1.0::cuda-toolkit
 conda install pytorch==2.4.0 torchvision==0.19.0 pytorch-cuda=12.1 -c pytorch -c nvidia
 pip install -r requirements.txt
 
-# Optional: Install Flash Attention for acceleration. If it fails, try: pip install flash-attn==2.5.8
+# Optional: Install Flash Attention for acceleration
 pip install flash-attn --no-build-isolation
 ```
 
@@ -23,8 +25,8 @@ pip install flash-attn --no-build-isolation
 ## Data Preparation
 
 ```bash
-# Set up Hugging Face endpoint if needed 
-# export HF_ENDPOINT=[https://hf-mirror.com](https://hf-mirror.com)
+# Set up Hugging Face endpoint if needed
+# export HF_ENDPOINT=https://hf-mirror.com
 
 # Install Hugging Face Hub library to download datasets
 pip install -U huggingface_hub
@@ -37,12 +39,11 @@ huggingface-cli download --repo-type dataset --resume-download fxmeng/pissa-data
 
 ## Quick Start
 
-
 ```bash
 # Start training with default parameters
-bash scripts/ba-lora.sh
+# Please ensure the script name in `scripts/` matches this command.
+bash scripts/run_training.sh
 ```
-
 
 ### Visualizing Last Hidden Layer Features with t-SNE
 
