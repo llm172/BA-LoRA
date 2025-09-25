@@ -22,21 +22,6 @@ pip install flash-attn --no-build-isolation
 
 -----
 
-## Data Preparation
-
-```bash
-# Set up Hugging Face endpoint if needed
-# export HF_ENDPOINT=https://hf-mirror.com
-
-# Install Hugging Face Hub library to download datasets
-pip install -U huggingface_hub
-
-# Download the dataset
-huggingface-cli download --repo-type dataset --resume-download fxmeng/pissa-dataset --local-dir pissa-dataset
-```
-
------
-
 ## Quick Start
 
 ```bash
