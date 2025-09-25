@@ -27,7 +27,7 @@ pip install flash-attn --no-build-isolation
 ```bash
 # Start training with default parameters
 # Please ensure the script name in `scripts/` matches this command.
-bash scripts/run_training.sh
+bash scripts/ba-lora.sh
 ```
 
 ### Visualizing Last Hidden Layer Features with t-SNE
