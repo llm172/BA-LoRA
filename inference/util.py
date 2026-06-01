@@ -1,4 +1,3 @@
-import pprint
 from grader import math_equal
 
 def last_boxed_only(sample):
@@ -192,7 +191,7 @@ def strip_string(string):
 
     # remove percentage
     string = string.replace("\\%", "")
-    string = string.replace("\%", "")  # noqa: W605
+    string = string.replace("\\%", "")
 
     # " 0." equivalent to " ." and "{0." equivalent to "{." Alternatively, add "0" if "." is the start of the string
     string = string.replace(" .", " 0.")
@@ -245,7 +244,7 @@ def is_equiv(str1, str2, verbose=False):
         return res
     except Exception:
         #return str1 == str2
-        res = math_equal(str1,str1) or str1 == str2
+        res = math_equal(str1,str2) or str1 == str2
         return res
 
 class NotEqual:

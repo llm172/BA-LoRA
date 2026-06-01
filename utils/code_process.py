@@ -1,6 +1,4 @@
 from human_eval.data import write_jsonl, stream_jsonl
-import glob 
-from tqdm import tqdm
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -31,7 +29,7 @@ for code in stream_jsonl(args.path):
         try:
             next_line = completion.index('\n```')
             completion = completion[:next_line].strip()
-        except:
+        except ValueError:
             pass
     
     if "__name__ == \"__main__\"" in completion:

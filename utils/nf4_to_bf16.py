@@ -1,8 +1,6 @@
 import torch
 import argparse
 import bitsandbytes as bnb
-from peft import PeftModel
-import torch
 from transformers import AutoModelForCausalLM
 
 parser = argparse.ArgumentParser(

@@ -4,13 +4,10 @@ import re
 from fraction import Fraction
 from collections import defaultdict
 
-# [AUTOMATION EVOLUTION START]
-# 增加一个新的命令行参数, 用于接收可选的JSON输出文件路径
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_file', type=str, required=True, help="Path to the input file with model predictions.")
 parser.add_argument('--output_json_file', type=str, default=None, help="Optional. Path to save the final accuracies in JSON format.")
 args = parser.parse_args()
-# [AUTOMATION EVOLUTION END]
 
 def remove_right_units(string):
     # "\\text{ " only ever occurs (at least in the val set) when describing units
@@ -110,7 +107,7 @@ def strip_string(string):
 
     # remove percentage
     string = string.replace("\\%", "")
-    string = string.replace("\%", "")  # noqa: W605
+    string = string.replace("\\%", "")
 
     # " 0." equivalent to " ." and "{0." equivalent to "{." Alternatively, add "0" if "." is the start of the string
     string = string.replace(" .", " 0.")
@@ -221,14 +218,24 @@ def extract_answer_number(completion):
         return None
 
 def extract_commonsense_answer(dataset, sentence: str) -> float:
-    # (此函数无需修改)
+    sentence_ = sentence.strip().lower()
     if dataset == 'boolq':
-        sentence_ = sentence.strip()
         pred_answers = re.findall(r'true|false', sentence_)
         if not pred_answers:
             return ""
         return pred_answers[0]
-    # ... (其他 elif 分支保持不变) ...
+    if dataset in ['piqa', 'siqa', 'arc_challenge', 'arc_easy', 'openbookqa', 'hellaswag', 'winogrande']:
+        patterns = [
+            r'(?:answer is|answer:|the correct answer is)\s*\(?([a-e])\)?',
+            r'^\s*\(?([a-e])\)?[\.\):\s]',
+            r'\(([a-e])\)',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, sentence_)
+            if match:
+                return match.group(1)
+        return sentence_.split()[0].strip("().:") if sentence_ else ""
+    return ""
 
 results = defaultdict(list)
 with open(args.input_file, 'r') as f:
@@ -250,8 +257,6 @@ with open(args.input_file, 'r') as f:
             else:
                 results[data['type']].append(False)
 
-# [AUTOMATION EVOLUTION START]
-# 计算准确率并准备用于JSON输出的字典
 final_accuracies = {}
 for key, value in results.items():
     if len(value) > 0:
@@ -259,19 +264,15 @@ for key, value in results.items():
     else:
         acc = 0.0
     
-    # 保持原有的打印输出, 确保人类可读性
     print(f'{key} length====', len(value), f', {key} acc====', acc)
     
-    # 将结果存入字典
     final_accuracies[f'{key}_acc'] = acc
     final_accuracies[f'{key}_len'] = len(value)
 
-# 如果用户提供了JSON输出文件路径, 则将结果写入文件
 if args.output_json_file:
     try:
         with open(args.output_json_file, 'w') as f:
             json.dump(final_accuracies, f, indent=4)
-        print(f"✅ Accuracies successfully saved to {args.output_json_file}")
+        print(f"Accuracies successfully saved to {args.output_json_file}")
     except Exception as e:
-        print(f"❌ Error saving accuracies to JSON file: {e}")
-# [AUTOMATION EVOLUTION END]
+        print(f"Error saving accuracies to JSON file: {e}")

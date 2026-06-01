@@ -1,6 +1,4 @@
 import argparse
-import json
-import pdb
 import jsonlines
 
 import util
@@ -39,17 +37,9 @@ def process_results(doc, completion, answer):
         invalid_outputs.append(temp)
         return False
 def batch_data(data_list, batch_size=1):
-    n = len(data_list) // batch_size
-    batch_data = []
-    for i in range(n-1):
-        start = i * batch_size
-        end = (i+1)*batch_size
-        batch_data.append(data_list[start:end])
-
-    last_start = (n-1) * batch_size
-    last_end = MAX_INT
-    batch_data.append(data_list[last_start:last_end])
-    return batch_data
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive.")
+    return [data_list[i:i + batch_size] for i in range(0, len(data_list), batch_size)]
 
 def test_hendrycks_math(model, data_path, start=0, end=MAX_INT, batch_size=1, tensor_parallel_size=1):
     hendrycks_math_ins = []
@@ -59,7 +49,7 @@ def test_hendrycks_math(model, data_path, start=0, end=MAX_INT, batch_size=1, te
         "Write a response that appropriately completes the request.\n\n"
         "### Instruction:\n{instruction}\n\n### Response: Let's think step by step."
     )
-    print('promt =====', problem_prompt)
+    print('prompt =====', problem_prompt)
     with open(data_path, "r+", encoding="utf8") as f:
         for idx, item in enumerate(jsonlines.Reader(f)):
             temp_instr = problem_prompt.format(instruction=item["instruction"])
@@ -71,15 +61,15 @@ def test_hendrycks_math(model, data_path, start=0, end=MAX_INT, batch_size=1, te
     print('total length ===', len(hendrycks_math_ins))
     hendrycks_math_ins = hendrycks_math_ins[start:end]
     hendrycks_math_answers = hendrycks_math_answers[start:end]
-    print('lenght ====', len(hendrycks_math_ins))
+    print('length ====', len(hendrycks_math_ins))
     batch_hendrycks_math_ins = batch_data(hendrycks_math_ins, batch_size=batch_size)
 
     stop_tokens = ["Question:", "Question", "USER:", "USER", "ASSISTANT:", "ASSISTANT", "Instruction:", "Instruction", "Response:", "Response"]
     sampling_params = SamplingParams(temperature=0, top_p=1, max_tokens=2048, stop=stop_tokens)
-    print('sampleing =====', sampling_params)
+    print('sampling =====', sampling_params)
     llm = LLM(model=model,tensor_parallel_size=tensor_parallel_size)
     res_completions = []
-    for idx, (prompt, prompt_answer) in enumerate(zip(batch_hendrycks_math_ins, hendrycks_math_answers)):
+    for idx, prompt in enumerate(batch_hendrycks_math_ins):
         if isinstance(prompt, list):
             pass
         else:

@@ -1,7 +1,6 @@
 from human_eval.data import write_jsonl, read_problems
-from fire import Fire
-from tqdm import trange, tqdm
-from utils import initialize_text_to_text_model, model_inference
+import argparse
+from tqdm import tqdm
 import re
 from vllm import LLM, SamplingParams
 import os
@@ -60,8 +59,7 @@ def post_process(text):
 
 
 def generate_one_completion(model, sampling_params, prompt, template=True):
-    if template:
-        prompt_in = ALPACA_PREFIX_TEMPLATE_MD.format(PROMPT=prompt)
+    prompt_in = ALPACA_PREFIX_TEMPLATE_MD.format(PROMPT=prompt) if template else prompt
     pred_text = (
         model.generate(prompt_in, sampling_params=sampling_params, use_tqdm=False)[0]
         .outputs[0]
@@ -71,11 +69,10 @@ def generate_one_completion(model, sampling_params, prompt, template=True):
     return post_pred
 
 
-def main(model_name):
+def main(model_name, output_dir="./code_eval", num_samples_per_task=5, temperature=0.8, top_p=0.95, max_tokens=1024):
     problems = read_problems()
     model = LLM(model_name, dtype="bfloat16")
-    sampling_params = SamplingParams(top_p=0.95, temperature=0.8, max_tokens=1024)
-    num_samples_per_task = 5
+    sampling_params = SamplingParams(top_p=top_p, temperature=temperature, max_tokens=max_tokens)
     samples = [
         dict(
             task_id=task_id,
@@ -87,9 +84,25 @@ def main(model_name):
         for _ in range(num_samples_per_task)
     ]
     target_name = f"{model_name.replace('/', '_')}_humaneval_samples.jsonl"
-    target_name = os.path.join("./code_eval", target_name)
+    os.makedirs(output_dir, exist_ok=True)
+    target_name = os.path.join(output_dir, target_name)
     write_jsonl(target_name, samples,append=False)
 
 
 if __name__ == "__main__":
-    Fire(main)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_name", type=str, required=True)
+    parser.add_argument("--output_dir", type=str, default="./code_eval")
+    parser.add_argument("--num_samples_per_task", type=int, default=5)
+    parser.add_argument("--temperature", type=float, default=0.8)
+    parser.add_argument("--top_p", type=float, default=0.95)
+    parser.add_argument("--max_tokens", type=int, default=1024)
+    args = parser.parse_args()
+    main(
+        model_name=args.model_name,
+        output_dir=args.output_dir,
+        num_samples_per_task=args.num_samples_per_task,
+        temperature=args.temperature,
+        top_p=args.top_p,
+        max_tokens=args.max_tokens,
+    )

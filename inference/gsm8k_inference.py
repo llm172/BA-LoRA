@@ -51,17 +51,9 @@ def extract_answer_number(completion):
         return None
 
 def batch_data(data_list, batch_size=1):
-    n = len(data_list) // batch_size
-    batch_data = []
-    for i in range(n-1):
-        start = i * batch_size
-        end = (i+1)*batch_size
-        batch_data.append(data_list[start:end])
-
-    last_start = (n-1) * batch_size
-    last_end = MAX_INT
-    batch_data.append(data_list[last_start:last_end])
-    return batch_data
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive.")
+    return [data_list[i:i + batch_size] for i in range(0, len(data_list), batch_size)]
 
 
 def gsm8k_test(model, data_path, start=0, end=MAX_INT, batch_size=1, tensor_parallel_size=1):
@@ -73,7 +65,7 @@ def gsm8k_test(model, data_path, start=0, end=MAX_INT, batch_size=1, tensor_para
         "Write a response that appropriately completes the request.\n\n"
         "### Instruction:\n{instruction}\n\n### Response: Let's think step by step."
     )
-    print('promt =====', problem_prompt)
+    print('prompt =====', problem_prompt)
     with open(data_path,"r+", encoding="utf8") as f:
         for idx, item in enumerate(jsonlines.Reader(f)):
             temp_instr = problem_prompt.format(instruction=item["question"])
@@ -84,16 +76,16 @@ def gsm8k_test(model, data_path, start=0, end=MAX_INT, batch_size=1, tensor_para
 
     gsm8k_ins = gsm8k_ins[start:end]
     gsm8k_answers = gsm8k_answers[start:end]
-    print('lenght ====', len(gsm8k_ins))
+    print('length ====', len(gsm8k_ins))
     batch_gsm8k_ins = batch_data(gsm8k_ins, batch_size=batch_size)
 
     stop_tokens = ["Instruction:", "Instruction", "Response:", "Response"]
     sampling_params = SamplingParams(temperature=0, top_p=1, max_tokens=1024, stop=stop_tokens)
-    print('sampleing =====', sampling_params)
+    print('sampling =====', sampling_params)
     llm = LLM(model=model,tensor_parallel_size=tensor_parallel_size)
     result = []
     res_completions = []
-    for idx, (prompt, prompt_answer) in enumerate(zip(batch_gsm8k_ins, gsm8k_answers)):
+    for idx, prompt in enumerate(batch_gsm8k_ins):
         if isinstance(prompt, list):
             pass
         else:
@@ -134,4 +126,3 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     gsm8k_test(model=args.model, data_path=args.data_file, start=args.start, end=args.end, batch_size=args.batch_size, tensor_parallel_size=args.tensor_parallel_size)
-

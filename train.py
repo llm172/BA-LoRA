@@ -1,5 +1,4 @@
 import copy
-import random
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Sequence, List
 import logging
@@ -30,7 +29,7 @@ PROMPT = (
 @dataclass
 class TrainingArguments(transformers.TrainingArguments):
     model_name_or_path: Optional[str] = field(default="meta-llama/Meta-Llama-3-8B")
-    attn_implementation: Optional[str] = field(default="flash_attention_2", metadata={"help": "Attention implementation to use. E.g., 'flash_attention_2' or 'sdpa'."})
+    attn_implementation: Optional[str] = field(default="sdpa", metadata={"help": "Attention implementation to use. E.g., 'flash_attention_2' or 'sdpa'."})
     full_finetune: Optional[bool] = field(default=False)
     adapter_name_or_path: Optional[str] = field(default=None, metadata={"help": ("Pre-initialized PiSSA adapter path."),},)
     init_weights: bool | str = field(default=True, metadata={"help": ("True -> LoRA; `pissa` -> PiSSA."),},)
@@ -82,7 +81,15 @@ class BALoRATrainer(Trainer):
             if self.args.use_adaptive_regularization:
                 self.max_entropy = np.log(self.model.config.vocab_size)
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    @staticmethod
+    def _randomized_topk_singular_values(matrix: torch.Tensor, k: int) -> torch.Tensor:
+        """Approximate the leading singular values for large NLG logit matrices."""
+        min_dim = min(matrix.shape)
+        q = min(min_dim, max(k + 5, k))
+        _, singular_values, _ = torch.svd_lowrank(matrix.float(), q=q, niter=2)
+        return singular_values[:k].to(matrix.dtype)
+
+    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         outputs = model(**inputs)
         task_loss = outputs.loss
         if not self.args.use_ba_lora:
@@ -94,7 +101,7 @@ class BALoRATrainer(Trainer):
         loss_logs = {"task_loss": task_loss.item()}
 
         current_step = self.state.global_step
-        total_steps = self.state.max_steps
+        total_steps = max(int(self.state.max_steps or 1), 1)
 
         current_lambda1 = self.args.lambda1
         current_lambda2 = self.args.lambda2
@@ -102,12 +109,23 @@ class BALoRATrainer(Trainer):
 
         pt_logits = None
         if self.args.use_adaptive_regularization or self.args.lambda1 > 0 or self.args.lambda1_schedule is not None:
-            if self.pt_model.device != model.device: self.pt_model.to(model.device)
+            if self.pt_model.device != ft_logits.device:
+                self.pt_model.to(ft_logits.device)
+            teacher_inputs = {k: v for k, v in inputs.items() if k != "labels"}
             with torch.no_grad():
-                pt_logits = self.pt_model(**inputs).logits
+                pt_logits = self.pt_model(**teacher_inputs).logits
         
         if self.args.use_adaptive_regularization:
-            pass
+            mask = labels != IGNORE_INDEX
+            if pt_logits is not None and mask.any():
+                temp = max(float(self.args.distill_temp), 1e-6)
+                teacher_probs = F.softmax(pt_logits[mask] / temp, dim=-1)
+                teacher_entropy = -(teacher_probs * torch.log(teacher_probs.clamp_min(1e-8))).sum(dim=-1).mean()
+                confidence = 1.0 - (teacher_entropy / self.max_entropy).clamp(0.0, 1.0)
+                lambda1_min = self.args.lambda1_min if self.args.lambda1_min is not None else 0.1 * self.args.lambda1
+                lambda1_max = self.args.lambda1_max if self.args.lambda1_max is not None else self.args.lambda1
+                current_lambda1 = lambda1_min + (lambda1_max - lambda1_min) * confidence.item()
+                loss_logs["dyn_lambda1"] = current_lambda1
         elif self.args.lambda1_schedule == 'cosine':
             initial_l1 = self.args.lambda1
             final_l1 = 0.1 * initial_l1
@@ -116,7 +134,18 @@ class BALoRATrainer(Trainer):
             loss_logs["dyn_lambda1"] = current_lambda1
         
         if self.args.lambda_focus_schedule == 'two_phase':
-            pass
+            warmup_steps = int(self.args.lambda_warmup_ratio * total_steps)
+            ramp_steps = max(int(self.args.lambda_ramp_up_ratio * total_steps), 1)
+            if current_step < warmup_steps:
+                focus_factor = 0.0
+            elif current_step < warmup_steps + ramp_steps:
+                focus_factor = (current_step - warmup_steps) / ramp_steps
+            else:
+                focus_factor = 1.0
+            current_lambda2 = self.args.lambda2 * focus_factor
+            current_lambda3 = self.args.lambda3 * focus_factor
+            loss_logs["dyn_lambda2"] = current_lambda2
+            loss_logs["dyn_lambda3"] = current_lambda3
         elif self.args.lambda_focus_schedule == 'linear_warmup':
             warmup_steps = int(self.args.lambda_warmup_ratio * total_steps)
             if current_step < warmup_steps:
@@ -140,7 +169,7 @@ class BALoRATrainer(Trainer):
             log_p_ft = F.log_softmax(ft_logits / temp, dim=-1)
             p_pt = F.softmax(pt_logits / temp, dim=-1)
             kl_mask = (labels != IGNORE_INDEX).unsqueeze(-1)
-            kl_loss = (F.kl_div(log_p_ft, p_pt, reduction='none', log_target=False).sum(-1) * kl_mask.squeeze(-1)).sum() / kl_mask.sum()
+            kl_loss = (F.kl_div(log_p_ft, p_pt, reduction='none', log_target=False).sum(-1) * kl_mask.squeeze(-1)).sum() / kl_mask.sum().clamp_min(1)
             kl_loss *= (temp * temp)
             total_loss += current_lambda1 * kl_loss
             loss_logs["c_reg_loss"] = kl_loss.item()
@@ -166,11 +195,18 @@ class BALoRATrainer(Trainer):
             valid_logits = ft_logits.view(-1, ft_logits.size(-1))[mask]
             if valid_logits.shape[0] > 1 and valid_logits.shape[1] > 1:
                 try:
-                    s = torch.linalg.svdvals(valid_logits)
+                    k = min(self.args.svd_k, min(valid_logits.shape))
+                    use_randomized_svd = valid_logits.shape[-1] > 4096 and k < min(valid_logits.shape)
+                    if use_randomized_svd:
+                        s = self._randomized_topk_singular_values(valid_logits, k)
+                        sum_top_k_sv = torch.sum(s)
+                        norm = torch.linalg.matrix_norm(valid_logits.float(), ord="fro").to(valid_logits.dtype)
+                    else:
+                        s = torch.linalg.svdvals(valid_logits.float()).to(valid_logits.dtype)
+                        sum_top_k_sv = torch.sum(s[:k])
+                        norm = torch.sqrt(torch.sum(s * s)) if self.args.svd_frob_norm else torch.sum(s)
                     k = min(self.args.svd_k, len(s))
-                    sum_top_k_sv = torch.sum(s[:k])
-                    norm = torch.sqrt(torch.sum(s*s)) if self.args.svd_frob_norm else torch.sum(s)
-                    if norm > 1e-8:
+                    if norm.detach() > 1e-8:
                         svd_regularizer = - (sum_top_k_sv / norm)
                         total_loss += current_lambda3 * svd_regularizer
                         loss_logs["svd_reg_loss"] = svd_regularizer.item()
@@ -265,13 +301,10 @@ def build_model(script_args, checkpoint_dir):
             logger.info(f"Initializing adapter from {adapter_path}.")
             try:
                 with open(os.path.join(adapter_path, 'adapter_config.json'), 'r') as f:
-                    adapter_config_dict = json.load(f)
+                    json.load(f)
             except Exception as e:
                 raise IOError(f"Could not load adapter_config.json at {adapter_path}") from e
-            VALID_LORA_CONFIG_KEYS = {k for k,v in LoraConfig.__dataclass_fields__.items()}
-            cleaned_config_dict = {k: v for k, v in adapter_config_dict.items() if k in VALID_LORA_CONFIG_KEYS}
-            peft_config = LoraConfig(**cleaned_config_dict)
-            model = PeftModel.from_pretrained(model, adapter_path, is_trainable=True, config=peft_config)
+            model = PeftModel.from_pretrained(model, adapter_path, is_trainable=True)
         else:
             logger.info('Creating new LoRA/PiSSA modules...')
             peft_config = LoraConfig(
@@ -323,9 +356,12 @@ def train():
             raise ValueError("base_model_for_pt is required for BA-LoRA.")
         if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
             logger.info(f"Loading frozen base model from: {script_args.base_model_for_pt}")
-        compute_dtype = torch.bfloat16 if script_args.bf16 else torch.float16
+        compute_dtype = torch.bfloat16 if script_args.bf16 else (torch.float16 if script_args.fp16 else torch.float32)
         pt_model = transformers.AutoModelForCausalLM.from_pretrained(
-            script_args.base_model_for_pt, torch_dtype=compute_dtype, trust_remote_code=True
+            script_args.base_model_for_pt,
+            torch_dtype=compute_dtype,
+            trust_remote_code=True,
+            attn_implementation=script_args.attn_implementation,
         )
 
     all_training_dataset = []

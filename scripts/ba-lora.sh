@@ -3,6 +3,7 @@
 # --- 1. Global Variables ---
 BASE_MODEL="meta-llama/Llama-2-7b-hf"
 DATA_PATH="pissa-dataset"
+ATTN_IMPLEMENTATION="${ATTN_IMPLEMENTATION:-sdpa}"
 export HF_ENDPOINT=https://hf-mirror.com
 MASTER_PORT_START=16990
 
@@ -40,7 +41,7 @@ echo "--------------------------------------------------------------------"
 for i in "${!SEEDS[@]}"; do
     SEED_TO_SUMMON=${SEEDS[$i]}
     MASTER_PORT=$((MASTER_PORT_START + i))
-    OUTPUT_PATH="output/metamath-BA-LoRA-Llama-2-7b-r128${TARGET_RANK}_seed${SEED_TO_SUMMON}"
+    OUTPUT_PATH="output/metamath-BA-LoRA-Llama-2-7b-r${TARGET_RANK}_seed${SEED_TO_SUMMON}"
 
     echo "===================================================================="
     echo "Launching Training Run #${i+1}"
@@ -52,6 +53,7 @@ for i in "${!SEEDS[@]}"; do
     deepspeed --master_port=${MASTER_PORT} --include=localhost:0,1 train.py \
         --deepspeed configs/ds_config_zero2_no_offload.json \
         --model_name_or_path $RES_MODEL \
+        --attn_implementation $ATTN_IMPLEMENTATION \
         --adapter_name_or_path "pissa_init" \
         --use_ba_lora True \
         --base_model_for_pt $BASE_MODEL \
@@ -112,4 +114,3 @@ for i in "${!SEEDS[@]}"; do
 done
 
 echo "All training runs completed."
-

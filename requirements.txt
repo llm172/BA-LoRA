@@ -3,10 +3,15 @@ transformers==4.45.1
 datasets==3.2.0
 peft==0.14.0
 deepspeed==0.15.4
+bitsandbytes
 vllm
 tensorboardX
 tqdm
 attrdict
+jsonlines
+sympy
+scikit-learn
+matplotlib
 human_eval
 evalplus
 fraction
