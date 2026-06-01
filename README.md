@@ -93,4 +93,4 @@ url={https://openreview.net/forum?id=q0X9SiXiRO}
 
 ## Acknowledgements
 
-This codebase is implemented on top of the excellent PiSSA codebase. We sincerely thank the PiSSA authors for releasing their implementation and for providing a strong foundation for efficient low-rank adaptation research.
+This codebase is implemented on top of the excellent [PiSSA](https://github.com/MuLabPKU/PiSSA) codebase. We sincerely thank the PiSSA authors for releasing their implementation and for providing a strong foundation for efficient low-rank adaptation research.
